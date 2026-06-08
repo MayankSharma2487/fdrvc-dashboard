@@ -199,18 +199,12 @@ LICENSE_COLS = [
 # ─────────────────────────────────────────────
 
 MC_INSTALLMENT_MAP = {
-
-    "1st Installment": "1st Installment",
-
-    "2 nd Installment": "2 nd Installment",
-
-    "3rd Installment": "3rd Installment",
-
-    "4th Installment": "4th Installment",
-
-    "5th Installment": "5th Installment",
-
-    "6th Installment": "6th Installment",
+    "1st Installment":  ("1st installment", None),
+    "2 nd Installment": ("2nd installment", None),
+    "3rd Installment":  ("3rd installment", None),
+    "4th Installment":  ("4th installment", None),
+    "5th Installment":  ("5th installment", None),
+    "6th Installment":  ("6th installment", None),
 }
 
 # ─────────────────────────────────────────────

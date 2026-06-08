@@ -84,8 +84,8 @@ def show_equity_grants(fdf):
                                 text="Equity (Cr)")
                     fig.update_traces(texttemplate='₹%{text:.2f}Cr', textposition='outside')
                     fig.update_coloraxes(showscale=False)
-                    fig.update_layout(height=450)
-                    st.plotly_chart(fig, use_container_width=True)
+                    fig.update_layout(height=430)
+                    st.plotly_chart(fig, use_container_width=False)
                 else:
                     st.info(f"No equity data recorded for {sel_tranche}.")
 
@@ -114,7 +114,7 @@ def show_equity_grants(fdf):
             fig2.update_layout(
                 yaxis=dict(title="Amount (Cr)"),
                 yaxis2=dict(overlaying="y", side="right", title="FPO Count"),
-                template=PLOTLY_TEMPLATE, height=440,
+                template=PLOTLY_TEMPLATE, height=420,
                 legend=dict(orientation="h", y=-0.15)
             )
             st.plotly_chart(fig2, use_container_width=True)

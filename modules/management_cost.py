@@ -23,6 +23,12 @@ from utils.charts import section_header
 from utils.constants import PLOTLY_TEMPLATE, COLORS, SAVE_PATH
 
 
+@st.cache_data(show_spinner=False)
+def _get_mc_installment_map(col_tuple):
+    """Cache installment column detection by DataFrame column signature."""
+    import pandas as pd
+    dummy_df = pd.DataFrame(columns=list(col_tuple))
+    return build_mc_installment_map(dummy_df)
 
 def show_management_cost(fdf,
 

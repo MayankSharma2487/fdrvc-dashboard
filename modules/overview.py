@@ -63,7 +63,8 @@ def show_overview(fdf,get_df,fpo_set,state_filter,fpo_filter):
             )
 
     # --- CORE METRIC CALCULATIONS ---
-    total_fpos = len(deduplicate_fpos(reg)) if not reg.empty else 0
+    total_fpos = len(reg) if not reg.empty else 0
+
 
     # 1. Overall Turnover (Deduplicated per FPO and Financial Year)
     overall_to = 0.0
@@ -93,12 +94,8 @@ def show_overview(fdf,get_df,fpo_set,state_filter,fpo_filter):
     source_df = mc if (mc_total_col and not mc.empty) else base_df
     total_mc = safe_sum(source_df, mc_total_col) / 1e7 if mc_total_col else 0
 
-    # 4. CBBO Costs (Automated + Manual Excel)
-    cbbo_total_inr, _, _ = compute_cbbo_totals(cbbo)
-    total_cbbo = cbbo_total_inr / 1e7
-
-    manual_cbbo_total = 0.0
-
+    # 4. CBBO Costs — prefer saved manual file; fall back to live API data.
+    # Do NOT add both together: that double-counts FPOs present in both sources.
     if os.path.exists(SAVE_PATH):
 
         try:
@@ -127,20 +124,34 @@ def show_overview(fdf,get_df,fpo_set,state_filter,fpo_filter):
                 fpo_filter
             )
 
-            m_t, _, _ = compute_cbbo_totals(
-                cbbo_m
-            )
+            # Merge manual (authoritative) + live rows for FPOs not in manual
+            manual_reg_col = find_col(cbbo_m, "fpo", "reg") or find_col(cbbo_m, "reg")
+            live_reg_col   = find_col(cbbo, "fpo", "reg") or find_col(cbbo, "reg")
+            if manual_reg_col and live_reg_col and not cbbo.empty:
+                manual_regs = set(cbbo_m[manual_reg_col].dropna().astype(str).str.strip())
+                cbbo_extra  = cbbo[~cbbo[live_reg_col].astype(str).str.strip().isin(manual_regs)]
+                import pandas as _pd
+                cbbo_final = _pd.concat([cbbo_m, cbbo_extra], ignore_index=True)
+            else:
+                cbbo_final = cbbo_m
 
-            manual_cbbo_total = m_t / 1e7
+            cbbo_total_inr, _, _ = compute_cbbo_totals(cbbo_final)
+            total_cbbo = cbbo_total_inr / 1e7
 
         except Exception as e:
 
             st.sidebar.error(
                 f"Error loading manual CBBO file: {e}"
             )
+            cbbo_total_inr, _, _ = compute_cbbo_totals(cbbo)
+            total_cbbo = cbbo_total_inr / 1e7
+
+    else:
+        cbbo_total_inr, _, _ = compute_cbbo_totals(cbbo)
+        total_cbbo = cbbo_total_inr / 1e7
 
     # 5. Combined Totals
-    total_fund = total_eq + total_mc + total_cbbo + manual_cbbo_total
+    total_fund = total_eq + total_mc + total_cbbo
     total_cr   = safe_sum(cr, "Loan Sanctioned Amount (INR)") / 1e7
     total_sh   = int(safe_sum(profile, "Total Shareholders")) if not profile.empty else 0
     loan_fpo_count = int((safe_num(cr, "Loan Sanctioned Amount (INR)") > 0).sum()) if not cr.empty else 0

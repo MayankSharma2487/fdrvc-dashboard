@@ -9,6 +9,19 @@ from utils.charts import *
 from utils.constants import *
 from utils.filters import *
 
+@st.cache_data(show_spinner=False)
+def load_cbbo_manual(save_path):
+    """Load manually uploaded CBBO cost file. Cached until file changes."""
+    if not os.path.exists(save_path):
+        return pd.DataFrame()
+    try:
+        df = pd.read_excel(save_path, engine="openpyxl")
+        df.columns = df.columns.str.strip().str.replace("\n", " ").str.strip()
+        return strip_header_row(df)
+    except Exception as e:
+        st.warning(f"Manual CBBO load error: {e}")
+        return pd.DataFrame()
+
 def show_financial_analysis(fdf, fpo_set, state_filter, fpo_filter):
     # ══════════════════════════════════════════════════════
     # PAGE: FINANCIAL ANALYSIS
@@ -35,18 +48,30 @@ def show_financial_analysis(fdf, fpo_set, state_filter, fpo_filter):
     total_mc = safe_sum(mc, mc_total_col) / 1e7 if mc_total_col and not mc.empty else 0
     mc_fpo_count = int((safe_num(mc, mc_total_col) > 0).sum()) if mc_total_col and not mc.empty else 0
 
-    # Main CBBO Logic (Merge API + Manual Excel)
-    final_cbbo_df = cbbo.copy()
+    # Main CBBO Logic — prefer saved manual file when it exists; fall back to
+    # live API data.  We do NOT concat both blindly: if the API and the manual
+    # file cover the same FPOs the totals would be double-counted.
     if os.path.exists(SAVE_PATH):
         try:
             cbbo_manual = pd.read_excel(SAVE_PATH, engine="openpyxl")
             cbbo_manual.columns = (cbbo_manual.columns.str.strip().str.replace("\n", " ").str.strip())
             cbbo_manual = strip_header_row(cbbo_manual)
             cbbo_manual = filter_by_fpo_set(cbbo_manual, fpo_set, state_filter, fpo_filter)
-            
-            final_cbbo_df = pd.concat([final_cbbo_df, cbbo_manual], ignore_index=True).drop_duplicates()
+            # Use manual file as primary; add only live rows for FPOs NOT in manual file
+            manual_reg_col = find_col(cbbo_manual, "fpo", "reg") or find_col(cbbo_manual, "reg")
+            live_reg_col   = find_col(cbbo, "fpo", "reg") or find_col(cbbo, "reg")
+            if manual_reg_col and live_reg_col and not cbbo.empty:
+                manual_regs = set(cbbo_manual[manual_reg_col].dropna().astype(str).str.strip())
+                cbbo_extra  = cbbo[~cbbo[live_reg_col].astype(str).str.strip().isin(manual_regs)]
+                final_cbbo_df = pd.concat([cbbo_manual, cbbo_extra], ignore_index=True)
+            else:
+                # Can't isolate reg-no columns — manual file is authoritative
+                final_cbbo_df = cbbo_manual
         except Exception as e:
             st.warning(f"Manual CBBO merge error: {e}")
+            final_cbbo_df = cbbo.copy()
+    else:
+        final_cbbo_df = cbbo.copy()
 
     final_cbbo_total, final_cost_series, final_cbbo_count = compute_cbbo_totals(final_cbbo_df)
     total_cbbo = final_cbbo_total / 1e7
@@ -163,17 +188,12 @@ def show_financial_analysis(fdf, fpo_set, state_filter, fpo_filter):
                 )
 
                 fig_mc.update_traces(
-
                     texttemplate='₹%{text:.2f}',
                     textposition='outside'
                 )
-
                 fig_mc.update_layout(
-
                     height=450,
-
                     coloraxis_showscale=False,
-
                     margin=dict(
                         l=20,
                         r=20,
@@ -181,7 +201,6 @@ def show_financial_analysis(fdf, fpo_set, state_filter, fpo_filter):
                         b=20
                     )
                 )
-
                 st.plotly_chart(
                     fig_mc,
                     use_container_width=True

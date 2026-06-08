@@ -196,6 +196,18 @@ def show_business_turnover(fdf):
                         color_discrete_map={"Output": COLORS["green2"], "Input": COLORS["amber"], "Other": COLORS["teal"]})
             fig4.update_layout(height=360)
             st.plotly_chart(fig4, use_container_width=True)
+            st.write("Rows:", len(yw))
+
+            st.write(
+                "Turnover Total:",
+                round(
+                    pd.to_numeric(
+                        yw["Total Turnover (INR)"],
+                        errors="coerce"
+                    ).sum()/1e7,
+                    2
+                )
+            )
 
     with c5:
         st.markdown(section_header("Input Activity State-Wise (Cr)"), unsafe_allow_html=True)
